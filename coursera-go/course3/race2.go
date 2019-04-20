@@ -1,9 +1,11 @@
+//+build disabled
+
 package main
 
 import (
-  "fmt"
-  "sync"
-  "time"
+	"fmt"
+	"sync"
+	"time"
 )
 
 var x int
@@ -96,10 +98,10 @@ func attempt6() {
 }
 
 func main() {
-  // attempt1()
-  // attempt2()
-  // attempt3()
-  // attempt4()
-  // attempt5()
-  attempt6()
+	// attempt1()
+	// attempt2()
+	// attempt3()
+	// attempt4()
+	// attempt5()
+	attempt6()
 }
