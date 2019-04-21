@@ -24,6 +24,7 @@ type Simulator struct {
 	servers        map[string]*Server // key = server ID
 	logger         *Logger
 	// TODO: ADD MORE FIELDS HERE
+	completionChan map[int]chan string
 }
 
 func NewSimulator() *Simulator {
@@ -32,6 +33,7 @@ func NewSimulator() *Simulator {
 		0,
 		make(map[string]*Server),
 		NewLogger(),
+		make(map[int]chan string),
 	}
 }
 
@@ -108,6 +110,8 @@ func (sim *Simulator) StartSnapshot(serverId string) {
 	sim.nextSnapshotId++
 	sim.logger.RecordEvent(sim.servers[serverId], StartSnapshot{serverId, snapshotId})
 	// TODO: IMPLEMENT ME
+	sim.completionChan[snapshotId] = make(chan string, len(sim.servers))
+	sim.servers[serverId].StartSnapshot(snapshotId)
 }
 
 // Callback for servers to notify the simulator that the snapshot process has
@@ -115,6 +119,7 @@ func (sim *Simulator) StartSnapshot(serverId string) {
 func (sim *Simulator) NotifySnapshotComplete(serverId string, snapshotId int) {
 	sim.logger.RecordEvent(sim.servers[serverId], EndSnapshot{serverId, snapshotId})
 	// TODO: IMPLEMENT ME
+	sim.completionChan[snapshotId] <- serverId
 }
 
 // Collect and merge snapshot state from all the servers.
@@ -122,5 +127,15 @@ func (sim *Simulator) NotifySnapshotComplete(serverId string, snapshotId int) {
 func (sim *Simulator) CollectSnapshot(snapshotId int) *SnapshotState {
 	// TODO: IMPLEMENT ME
 	snap := SnapshotState{snapshotId, make(map[string]int), make([]*SnapshotMessage, 0)}
+	for i := 0; i < len(sim.servers); i++ {
+		serverId := <-sim.completionChan[snapshotId]
+		// merge server's snapshot state
+		snapForServerRaw, _ := sim.servers[serverId].SnapshotStates.Load(snapshotId)
+		snapForServer := snapForServerRaw.(SnapshotState)
+		for k, v := range snapForServer.tokens {
+			snap.tokens[k] = v
+		}
+		snap.messages = append(snap.messages, snapForServer.messages...)
+	}
 	return &snap
 }
