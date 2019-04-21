@@ -3,7 +3,9 @@ package cos418_hw1_1
 import (
 	"bufio"
 	"io"
+	"io/ioutil"
 	"strconv"
+	"strings"
 )
 
 // Sum numbers from channel `nums` and output sum to `out`.
@@ -12,6 +14,11 @@ import (
 func sumWorker(nums chan int, out chan int) {
 	// TODO: implement me
 	// HINT: use for loop over `nums`
+	sum := 0
+	for num := range nums {
+		sum += num
+	}
+	out <- sum
 }
 
 // Read integers from the file `fileName` and return sum of all values.
@@ -23,7 +30,32 @@ func sum(num int, fileName string) int {
 	// TODO: implement me
 	// HINT: use `readInts` and `sumWorkers`
 	// HINT: used buffered channels for splitting numbers between workers
-	return 0
+	data, err := ioutil.ReadFile(fileName)
+	checkError(err)
+	nums, err := readInts(strings.NewReader(string(data)))
+	checkError(err)
+	out := make(chan int, num)
+	loadSize, left := len(nums)/num, len(nums)%num
+	index := 0
+	for i := 0; i < num; i++ {
+		bufSize := loadSize
+		if left > 0 {
+			bufSize++
+			left--
+		}
+		inChan := make(chan int, bufSize)
+		go sumWorker(inChan, out)
+		for j := 0; j < bufSize; j++ {
+			inChan <- nums[index]
+			index++
+		}
+		close(inChan)
+	}
+	sum := 0
+	for i := 0; i < num; i++ {
+		sum += <-out
+	}
+	return sum
 }
 
 // Read a list of integers separated by whitespace from `r`.

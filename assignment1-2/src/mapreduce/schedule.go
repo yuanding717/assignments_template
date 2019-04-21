@@ -1,5 +1,9 @@
 package mapreduce
 
+import (
+	"time"
+)
+
 // schedule starts and waits for all tasks in the given phase (Map or Reduce).
 func (mr *Master) schedule(phase jobPhase) {
 	var ntasks int
@@ -22,5 +26,39 @@ func (mr *Master) schedule(phase jobPhase) {
 	//
 	// TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
 	//
+
+	stats := make([]bool, ntasks)
+	for {
+		count := ntasks
+		for i := 0; i < ntasks; i++ {
+			if !stats[i] {
+				args := new(DoTaskArgs)
+				args.JobName = mr.jobName
+				args.Phase = phase
+				args.TaskNumber = i
+				args.NumOtherPhase = nios
+				if phase == mapPhase {
+					args.File = mr.files[i]
+				}
+				worker := <-mr.registerChannel
+				go func(slot int, worker string) {
+					ok := call(worker, "Worker.DoTask", &args, new(struct{}))
+					if ok {
+						stats[slot] = true
+						mr.registerChannel <- worker
+					} else {
+						debug("Schedule: worker %v error when doing task %v\n", worker, args)
+					}
+					// mr.registerChannel <- worker
+				}(i, worker)
+			} else {
+				count--
+			}
+		}
+		if count == 0 {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
 	debug("Schedule: %v phase done\n", phase)
 }
